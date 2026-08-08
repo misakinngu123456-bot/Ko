@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LINE風 リアルタイムチャット</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="login-screen" class="screen">
+        <div class="login-card">
+            <div class="logo-icon">💬</div>
+            <h2>LINE風チャット</h2>
+            <p>名前と部屋名（ID）を入力して開始</p>
+
+            <div class="input-group">
+                <label for="username-input">お名前</label>
+                <input type="text" id="username-input" placeholder="例: たろう" maxlength="12" required>
+            </div>
+
+            <div class="input-group">
+                <label for="room-input">部屋のキーワード / ルーム名</label>
+                <input type="text" id="room-input" placeholder="例: secret-123" value="自由広場" maxlength="20">
+                <small>※同じキーワードを入れた人同士で話せます</small>
+            </div>
+
+            <button id="join-btn">チャットを始める</button>
+        </div>
+    </div>
+
+    <div id="chat-screen" class="screen hidden">
+        <div class="chat-header">
+            <button id="leave-btn" class="back-btn">‹ 退出</button>
+            <div class="header-info">
+                <h3 id="display-room-name">トークルーム</h3>
+                <span id="user-count" class="online-badge">オンライン: 1人</span>
+            </div>
+            <div class="spacer"></div>
+        </div>
+
+        <div class="chat-body" id="chat-body"></div>
+
+        <form id="chat-form" class="chat-footer">
+            <input type="text" id="message-input" placeholder="メッセージを入力" autocomplete="off" required>
+            <button type="submit" id="send-btn">送信</button>
+        </form>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
