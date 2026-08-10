@@ -1,46 +1,58 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-app.use(express.static(path.join(__dirname)));
-
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-// チャット履歴の保持（メモリ上）
-let chatHistory = [];
+app.use(express.static('public'));
 
 io.on('connection', (socket) => {
+    // 部屋（ルーム）への参加処理
+    socket.on('join-room', ({ username, room }) => {
+        const cleanName = username.trim() || '名無し';
+        const cleanRoom = room.trim().toLowerCase() || '自由広場';
 
-    // 接続時にこれまでのチャット履歴を送信
-    socket.emit('init-history', chatHistory);
+        socket.username = cleanName;
+        socket.room = cleanRoom;
 
-    // メッセージ送信時
-    socket.on('send-message', (data) => {
-        const msgData = {
-            id: Date.now() + Math.random().toString(36).substr(2, 9),
-            name: data.name ? data.name.trim() : '名無し',
-            text: data.text ? data.text.trim() : '',
-            time: new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
-            socketId: socket.id
-        };
+        socket.join(cleanRoom);
 
-        if (msgData.text !== '') {
-            chatHistory.push(msgData);
-            // 直近100件のみ保持
-            if (chatHistory.length > 100) chatHistory.shift();
+        // 他メンバーへ通知＆送信者に完了通知
+        socket.to(cleanRoom).emit('system-message', `${cleanName} さんが入室しました`);
+        socket.emit('joined-success', { username: cleanName, room: cleanRoom });
 
-            // 全員に配信
-            io.emit('new-message', msgData);
+        // ルームの現在人数を更新
+        updateRoomUsers(cleanRoom);
+    });
+
+    // メッセージのグループ配信
+    socket.on('chat-message', (data) => {
+        if (!socket.room) return;
+        io.to(socket.room).emit('chat-message', {
+            id: socket.id,
+            username: socket.username,
+            message: data.message,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        });
+    });
+
+    // 切断処理
+    socket.on('disconnect', () => {
+        if (socket.room && socket.username) {
+            io.to(socket.room).emit('system-message', `${socket.username} さんが退室しました`);
+            updateRoomUsers(socket.room);
         }
     });
+
+    function updateRoomUsers(roomName) {
+        const clients = io.sockets.adapter.rooms.get(roomName);
+        const count = clients ? clients.size : 0;
+        io.to(roomName).emit('room-info', { userCount: count });
+    }
 });
 
+// オンライン環境用のポート設定
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`LINE Clone Server running on port ${PORT}`));
+server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
