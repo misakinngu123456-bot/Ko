@@ -1,66 +1,96 @@
-const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
-const path = require('path');
+const socket = io();
 
-const app = express();
-const server = http.createServer(app);
-const io = new Server(server);
+const loginScreen = document.getElementById('login-screen');
+const chatScreen = document.getElementById('chat-screen');
+const usernameInput = document.getElementById('username-input');
+const roomInput = document.getElementById('room-input');
+const joinBtn = document.getElementById('join-btn');
+const leaveBtn = document.getElementById('leave-btn');
 
-// public フォルダ内の静的ファイル（index.html等）を配信する設定
-app.use(express.static(path.join(__dirname, 'public')));
+const chatForm = document.getElementById('chat-form');
+const messageInput = document.getElementById('message-input');
+const chatBody = document.getElementById('chat-body');
+const displayRoomName = document.getElementById('display-room-name');
+const userCountSpan = document.getElementById('user-count');
 
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+joinBtn.addEventListener('click', () => {
+    const username = usernameInput.value.trim();
+    const room = roomInput.value.trim() || '自由広場';
+
+    if (!username) {
+        alert('お名前を入力してください！');
+        usernameInput.focus();
+        return;
+    }
+
+    socket.emit('join-room', { username, room });
 });
 
-// チャット履歴の保持（メモリ上）
-let chatHistory = [];
-
-io.on('connection', (socket) => {
-
-    // 接続時にこれまでのチャット履歴を送信
-    socket.emit('init-history', chatHistory);
-
-    // メッセージ送信時
-    socket.on('send-message', (data) => {
-        const msgData = {
-            id: Date.now() + Math.random().toString(36).substr(2, 9),
-            name: data.name ? data.name.trim() : '名無し',
-            text: data.text ? data.text.trim() : '',
-            time: new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
-            socketId: socket.id,
-            readCount: 0, // 既読人数
-            readUsers: []  // 既読したユーザーのリスト
-        };
-
-        if (msgData.text !== '') {
-            chatHistory.push(msgData);
-            // 直近100件のみ保持
-            if (chatHistory.length > 100) chatHistory.shift();
-
-            // 全員に配信
-            io.emit('new-message', msgData);
-        }
-    });
-
-    // 既読通知を受け取ったとき
-    socket.on('read-message', (data) => {
-        const { msgId, userName } = data;
-        const targetMsg = chatHistory.find(m => m.id === msgId);
-
-        if (targetMsg && !targetMsg.readUsers.includes(userName) && targetMsg.name !== userName) {
-            targetMsg.readUsers.push(userName);
-            targetMsg.readCount = targetMsg.readUsers.length;
-
-            // 全員に既読数の更新を通知
-            io.emit('update-read-count', {
-                msgId: targetMsg.id,
-                readCount: targetMsg.readCount
-            });
-        }
-    });
+socket.on('joined-success', (data) => {
+    displayRoomName.textContent = `# ${data.room}`;
+    loginScreen.classList.add('hidden');
+    chatScreen.classList.remove('hidden');
+    chatBody.innerHTML = '';
+    messageInput.focus();
 });
 
-const PORT = process.env.PORT || 10000;
-server.listen(PORT, () => console.log(`LINE Clone Server running on port ${PORT}`));
+socket.on('room-info', (data) => {
+    userCountSpan.textContent = `オンライン: ${data.userCount}人`;
+});
+
+leaveBtn.addEventListener('click', () => {
+    location.reload();
+});
+
+chatForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const msg = messageInput.value.trim();
+    if (msg) {
+        socket.emit('chat-message', { message: msg });
+        messageInput.value = '';
+    }
+});
+
+socket.on('system-message', (text) => {
+    const div = document.createElement('div');
+    div.className = 'system-msg';
+    div.textContent = text;
+    chatBody.appendChild(div);
+    scrollToBottom();
+});
+
+socket.on('chat-message', (data) => {
+    const isMine = data.id === socket.id;
+
+    const wrapper = document.createElement('div');
+    wrapper.className = `message-wrapper ${isMine ? 'mine' : 'other'}`;
+
+    if (!isMine) {
+        const nameDiv = document.createElement('div');
+        nameDiv.className = 'sender-name';
+        nameDiv.textContent = data.username;
+        wrapper.appendChild(nameDiv);
+    }
+
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'message-content';
+
+    const bubbleDiv = document.createElement('div');
+    bubbleDiv.className = 'bubble';
+    bubbleDiv.textContent = data.message;
+
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'msg-time';
+    timeSpan.textContent = data.time;
+
+    contentDiv.appendChild(bubbleDiv);
+    contentDiv.appendChild(timeSpan);
+    wrapper.appendChild(contentDiv);
+
+    chatBody.appendChild(wrapper);
+    scrollToBottom();
+});
+
+function scrollToBottom() {
+    chatBody.scrollTop = chatBody.scrollHeight;
+}
