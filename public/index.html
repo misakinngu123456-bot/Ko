@@ -11,7 +11,7 @@
         .chat-container { display: flex; flex-direction: column; height: 100vh; max-width: 500px; margin: 0 auto; background: #7494c0; }
         .chat-header { background: #273246; color: white; padding: 15px; text-align: center; font-weight: bold; font-size: 18px; }
         
-        /* ログイン領域 */
+        /* ログイン画面 */
         #loginOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center; z-index: 100; }
         .login-box { background: white; padding: 25px; border-radius: 12px; width: 85%; max-width: 350px; text-align: center; }
         .login-box input { width: 100%; padding: 12px; font-size: 16px; border: 1px solid #ccc; border-radius: 6px; margin-bottom: 12px; }
@@ -33,7 +33,7 @@
         .other-msg .bubble { background: white; color: #000; border-top-left-radius: 2px; }
         .my-msg .bubble { background: #85e249; color: #000; border-top-right-radius: 2px; }
 
-        /* 既読 & 時間表示 */
+        /* 既読 ＆ 時刻表示 */
         .meta-info { display: flex; flex-direction: column; align-items: flex-end; font-size: 10px; color: #e2e2e2; }
         .read-status { color: #ffffff; font-weight: bold; }
 
@@ -70,6 +70,7 @@
 <script>
     const socket = io();
     let myName = '';
+    let currentHistory = [];
 
     const loginOverlay = document.getElementById('loginOverlay');
     const usernameInput = document.getElementById('usernameInput');
@@ -78,6 +79,7 @@
     const messageInput = document.getElementById('messageInput');
     const sendBtn = document.getElementById('sendBtn');
 
+    // 読み込み時の自動復帰チェック
     window.addEventListener('load', () => {
         const savedName = sessionStorage.getItem('line_user_name');
         if (savedName) {
@@ -86,33 +88,39 @@
         }
     });
 
+    // 「スタート」ボタン押下時
     joinBtn.addEventListener('click', () => {
         const name = usernameInput.value.trim();
         if (name) {
             myName = name;
             sessionStorage.setItem('line_user_name', name);
             loginOverlay.classList.add('hidden');
+
+            // ログイン完了後に既存のメッセージすべてへ既読を送信
+            currentHistory.forEach(msg => sendReadReceipt(msg));
         }
     });
 
-    // 履歴受取時
+    // 過去履歴の受取
     socket.on('init-history', (history) => {
+        currentHistory = history;
         chatBody.innerHTML = '';
         history.forEach(msg => {
             appendMessage(msg);
-            sendReadReceipt(msg);
+            if (myName) sendReadReceipt(msg);
         });
         scrollToBottom();
     });
 
-    // 新着メッセージ受取時
+    // 新着メッセージ受取
     socket.on('new-message', (msg) => {
+        currentHistory.push(msg);
         appendMessage(msg);
-        sendReadReceipt(msg);
+        if (myName) sendReadReceipt(msg);
         scrollToBottom();
     });
 
-    // 既読数の更新通知受取時
+    // 既読数の更新を受信したとき
     socket.on('update-read-count', (data) => {
         const readEl = document.getElementById(`read-${data.msgId}`);
         if (readEl) {
@@ -121,8 +129,8 @@
         }
     });
 
+    // 既読通知を送る関数
     function sendReadReceipt(msg) {
-        // 自分以外のメッセージで、まだ読んでいない場合「既読」を送る
         if (msg.name !== myName && myName !== '') {
             socket.emit('read-message', { msgId: msg.id, userName: myName });
         }
