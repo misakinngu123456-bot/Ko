@@ -3,24 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LINE風 チャットアプリ</title>
+    <title>LINE風 リアルタイムチャット</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div id="login-screen" class="screen">
         <div class="login-card">
-            <h2>💬 LINE風チャット</h2>
-            <p>名前と部屋名を入力してください</p>
+            <div class="logo-icon">💬</div>
+            <h2>LINE風チャット</h2>
+            <p>名前と部屋名（ID）を入力して開始</p>
 
             <div class="input-group">
-                <label>お名前</label>
-                <input type="text" id="username-input" placeholder="例: たろう" required>
+                <label for="username-input">お名前</label>
+                <input type="text" id="username-input" placeholder="例: たろう" maxlength="12" required>
             </div>
 
             <div class="input-group">
-                <label>部屋名（キーワード）</label>
-                <input type="text" id="room-input" placeholder="例: room123" value="自由広場">
-                <small>※同じ部屋名を入れた人と会話できます</small>
+                <label for="room-input">部屋のキーワード / ルーム名</label>
+                <input type="text" id="room-input" placeholder="例: secret-123" value="自由広場" maxlength="20">
+                <small>※同じキーワードを入れた人同士で話せます</small>
             </div>
 
             <button id="join-btn">チャットを始める</button>
