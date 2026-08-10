@@ -3,151 +3,49 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LINE風チャット</title>
-    <style>
-        * { box-sizing: border-box; }
-        body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #7494c0; }
-        
-        .chat-container { display: flex; flex-direction: column; height: 100vh; max-width: 500px; margin: 0 auto; background: #7494c0; }
-        .chat-header { background: #273246; color: white; padding: 15px; text-align: center; font-weight: bold; font-size: 18px; position: relative; }
-        
-        /* ログイン領域 */
-        #loginOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center; z-index: 100; }
-        .login-box { background: white; padding: 25px; border-radius: 12px; width: 85%; max-width: 350px; text-align: center; }
-        .login-box input { width: 100%; padding: 12px; font-size: 16px; border: 1px solid #ccc; border-radius: 6px; margin-bottom: 12px; }
-        .login-box button { width: 100%; padding: 12px; font-size: 16px; background: #06c755; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
-
-        /* トーク画面 */
-        .chat-body { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 12px; }
-        
-        .message-row { display: flex; flex-direction: column; max-width: 75%; }
-        .message-row.my-msg { align-self: flex-end; align-items: flex-end; }
-        .message-row.other-msg { align-self: flex-start; align-items: flex-start; }
-
-        .sender-name { font-size: 12px; color: #ffffff; margin-bottom: 3px; margin-left: 2px; }
-        
-        .bubble-wrapper { display: flex; align-items: flex-end; gap: 5px; }
-        .my-msg .bubble-wrapper { flex-direction: row-reverse; }
-
-        .bubble { padding: 10px 14px; border-radius: 18px; font-size: 15px; line-height: 1.4; word-break: break-word; }
-        .other-msg .bubble { background: white; color: #000; border-top-left-radius: 2px; }
-        .my-msg .bubble { background: #85e249; color: #000; border-top-right-radius: 2px; }
-
-        .msg-time { font-size: 10px; color: #e2e2e2; }
-
-        /* 入力エリア */
-        .chat-footer { background: white; padding: 10px; display: flex; gap: 8px; align-items: center; }
-        .chat-footer input { flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 20px; font-size: 15px; outline: none; }
-        .chat-footer button { background: #06c755; color: white; border: none; padding: 10px 18px; border-radius: 20px; font-weight: bold; cursor: pointer; }
-        
-        .hidden { display: none !important; }
-    </style>
+    <title>LINE風 チャットアプリ</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <div id="login-screen" class="screen">
+        <div class="login-card">
+            <h2>💬 LINE風チャット</h2>
+            <p>名前と部屋名を入力してください</p>
 
-<div id="loginOverlay">
-    <div class="login-box">
-        <h3>💬 トークに参加</h3>
-        <input type="text" id="usernameInput" placeholder="お名前を入力">
-        <button id="joinBtn">スタート</button>
-    </div>
-</div>
-
-<div class="chat-container">
-    <div class="chat-header">LINE風グループトーク</div>
-    
-    <div class="chat-body" id="chatBody"></div>
-
-    <div class="chat-footer">
-        <input type="text" id="messageInput" placeholder="メッセージを入力..." autocomplete="off">
-        <button id="sendBtn">送信</button>
-    </div>
-</div>
-
-<script src="/socket.io/socket.io.js"></script>
-<script>
-    const socket = io();
-    let myName = '';
-
-    const loginOverlay = document.getElementById('loginOverlay');
-    const usernameInput = document.getElementById('usernameInput');
-    const joinBtn = document.getElementById('joinBtn');
-    const chatBody = document.getElementById('chatBody');
-    const messageInput = document.getElementById('messageInput');
-    const sendBtn = document.getElementById('sendBtn');
-
-    // 接続維持（再読み込み時の復帰用）
-    window.addEventListener('load', () => {
-        const savedName = sessionStorage.getItem('line_user_name');
-        if (savedName) {
-            myName = savedName;
-            loginOverlay.classList.add('hidden');
-        }
-    });
-
-    joinBtn.addEventListener('click', () => {
-        const name = usernameInput.value.trim();
-        if (name) {
-            myName = name;
-            sessionStorage.setItem('line_user_name', name);
-            loginOverlay.classList.add('hidden');
-        }
-    });
-
-    // 初期履歴の読み込み
-    socket.on('init-history', (history) => {
-        chatBody.innerHTML = '';
-        history.forEach(msg => appendMessage(msg));
-        scrollToBottom();
-    });
-
-    // 新着メッセージ受信
-    socket.on('new-message', (msg) => {
-        appendMessage(msg);
-        scrollToBottom();
-    });
-
-    function sendMessage() {
-        const text = messageInput.value.trim();
-        if (text && myName) {
-            socket.emit('send-message', { name: myName, text: text });
-            messageInput.value = '';
-        }
-    }
-
-    sendBtn.addEventListener('click', sendMessage);
-    messageInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') sendMessage();
-    });
-
-    function appendMessage(msg) {
-        const isMe = (msg.name === myName);
-        const row = document.createElement('div');
-        row.className = `message-row ${isMe ? 'my-msg' : 'other-msg'}`;
-
-        let html = '';
-        if (!isMe) {
-            html += `<div class="sender-name">${escapeHtml(msg.name)}</div>`;
-        }
-        
-        html += `
-            <div class="bubble-wrapper">
-                <div class="bubble">${escapeHtml(msg.text)}</div>
-                <div class="msg-time">${msg.time}</div>
+            <div class="input-group">
+                <label>お名前</label>
+                <input type="text" id="username-input" placeholder="例: たろう" required>
             </div>
-        `;
 
-        row.innerHTML = html;
-        chatBody.appendChild(row);
-    }
+            <div class="input-group">
+                <label>部屋名（キーワード）</label>
+                <input type="text" id="room-input" placeholder="例: room123" value="自由広場">
+                <small>※同じ部屋名を入れた人と会話できます</small>
+            </div>
 
-    function scrollToBottom() {
-        chatBody.scrollTop = chatBody.scrollHeight;
-    }
+            <button id="join-btn">チャットを始める</button>
+        </div>
+    </div>
 
-    function escapeHtml(str) {
-        return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    }
-</script>
+    <div id="chat-screen" class="screen hidden">
+        <div class="chat-header">
+            <button id="leave-btn" class="back-btn">‹ 退出</button>
+            <div class="header-info">
+                <h3 id="display-room-name">トークルーム</h3>
+                <span id="user-count" class="online-badge">オンライン: 1人</span>
+            </div>
+            <div class="spacer"></div>
+        </div>
+
+        <div class="chat-body" id="chat-body"></div>
+
+        <form id="chat-form" class="chat-footer">
+            <input type="text" id="message-input" placeholder="メッセージを入力" autocomplete="off" required>
+            <button type="submit" id="send-btn">送信</button>
+        </form>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>
