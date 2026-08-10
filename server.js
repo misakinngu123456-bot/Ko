@@ -13,7 +13,7 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// チャット履歴の保持
+// チャット履歴の保持（メモリ上）
 let chatHistory = [];
 
 io.on('connection', (socket) => {
@@ -28,34 +28,16 @@ io.on('connection', (socket) => {
             name: data.name ? data.name.trim() : '名無し',
             text: data.text ? data.text.trim() : '',
             time: new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
-            socketId: socket.id,
-            readCount: 0, // 既読人数
-            readUsers: []  // 既読したユーザーのリスト
+            socketId: socket.id
         };
 
         if (msgData.text !== '') {
             chatHistory.push(msgData);
+            // 直近100件のみ保持
             if (chatHistory.length > 100) chatHistory.shift();
 
-            // 送信者に通知 ＆ 他のユーザーに配信
+            // 全員に配信
             io.emit('new-message', msgData);
-        }
-    });
-
-    // 既読通知を受け取ったとき
-    socket.on('read-message', (data) => {
-        const { msgId, userName } = data;
-        const targetMsg = chatHistory.find(m => m.id === msgId);
-
-        if (targetMsg && !targetMsg.readUsers.includes(userName) && targetMsg.name !== userName) {
-            targetMsg.readUsers.push(userName);
-            targetMsg.readCount = targetMsg.readUsers.length;
-
-            // 全員に既読数の更新を通知
-            io.emit('update-read-count', {
-                msgId: targetMsg.id,
-                readCount: targetMsg.readCount
-            });
         }
     });
 });
