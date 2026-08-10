@@ -9,7 +9,7 @@
         body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #7494c0; }
         
         .chat-container { display: flex; flex-direction: column; height: 100vh; max-width: 500px; margin: 0 auto; background: #7494c0; }
-        .chat-header { background: #273246; color: white; padding: 15px; text-align: center; font-weight: bold; font-size: 18px; }
+        .chat-header { background: #273246; color: white; padding: 15px; text-align: center; font-weight: bold; font-size: 18px; position: relative; }
         
         /* ログイン領域 */
         #loginOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center; z-index: 100; }
@@ -33,9 +33,7 @@
         .other-msg .bubble { background: white; color: #000; border-top-left-radius: 2px; }
         .my-msg .bubble { background: #85e249; color: #000; border-top-right-radius: 2px; }
 
-        /* 既読 & 時間表示 */
-        .meta-info { display: flex; flex-direction: column; align-items: flex-end; font-size: 10px; color: #e2e2e2; }
-        .read-status { color: #ffffff; font-weight: bold; }
+        .msg-time { font-size: 10px; color: #e2e2e2; }
 
         /* 入力エリア */
         .chat-footer { background: white; padding: 10px; display: flex; gap: 8px; align-items: center; }
@@ -78,6 +76,7 @@
     const messageInput = document.getElementById('messageInput');
     const sendBtn = document.getElementById('sendBtn');
 
+    // 接続維持（再読み込み時の復帰用）
     window.addEventListener('load', () => {
         const savedName = sessionStorage.getItem('line_user_name');
         if (savedName) {
@@ -95,38 +94,18 @@
         }
     });
 
-    // 履歴受取時
+    // 初期履歴の読み込み
     socket.on('init-history', (history) => {
         chatBody.innerHTML = '';
-        history.forEach(msg => {
-            appendMessage(msg);
-            sendReadReceipt(msg);
-        });
+        history.forEach(msg => appendMessage(msg));
         scrollToBottom();
     });
 
-    // 新着メッセージ受取時
+    // 新着メッセージ受信
     socket.on('new-message', (msg) => {
         appendMessage(msg);
-        sendReadReceipt(msg);
         scrollToBottom();
     });
-
-    // 既読数の更新通知受取時
-    socket.on('update-read-count', (data) => {
-        const readEl = document.getElementById(`read-${data.msgId}`);
-        if (readEl) {
-            readEl.textContent = `既読 ${data.readCount}`;
-            readEl.classList.remove('hidden');
-        }
-    });
-
-    function sendReadReceipt(msg) {
-        // 自分以外のメッセージで、まだ読んでいない場合「既読」を送る
-        if (msg.name !== myName && myName !== '') {
-            socket.emit('read-message', { msgId: msg.id, userName: myName });
-        }
-    }
 
     function sendMessage() {
         const text = messageInput.value.trim();
@@ -146,8 +125,6 @@
         const row = document.createElement('div');
         row.className = `message-row ${isMe ? 'my-msg' : 'other-msg'}`;
 
-        const isReadVisible = isMe && msg.readCount > 0;
-
         let html = '';
         if (!isMe) {
             html += `<div class="sender-name">${escapeHtml(msg.name)}</div>`;
@@ -156,10 +133,7 @@
         html += `
             <div class="bubble-wrapper">
                 <div class="bubble">${escapeHtml(msg.text)}</div>
-                <div class="meta-info">
-                    <span class="read-status ${isReadVisible ? '' : 'hidden'}" id="read-${msg.id}">既読 ${msg.readCount || ''}</span>
-                    <span>${msg.time}</span>
-                </div>
+                <div class="msg-time">${msg.time}</div>
             </div>
         `;
 
